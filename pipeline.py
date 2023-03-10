@@ -1,5 +1,5 @@
 import os
-from utils import load_file, get_similarity, get_similarity_keyval
+from utils import load_file, get_similarity_sbert, get_similarity_keyval
 import pandas as pd
 from torch.utils.data import DataLoader
 from sentence_transformers import util, losses
@@ -9,7 +9,8 @@ from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
 import xgboost as xgb
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split
-
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 class Pipeline():
     def __init__(self, input_dir, output_dir):
@@ -40,7 +41,7 @@ class Pipeline():
         :return: DataFrame
         """
         # TODO: load csv from directory.
-        input_file = './data/computers_train/computers_train_large.json.gz'
+        input_file = './data/computers_train/computers_train_medium.json.gz'
         df = pd.read_json(input_file, compression='gzip', lines=True)
         df = df[['title_left', 'description_left', 'keyValuePairs_left', 'brand_left',
                  'title_right', 'description_right', 'keyValuePairs_right', 'brand_right', 'label']]
@@ -82,18 +83,36 @@ class Pipeline():
         )
         return title_model
 
-    def compute_features(self, df, ft_model, sbert_model):
-        # TODO: title, brand and keyValue using Tfidf
-        df['title_sim'] = df.apply(lambda x: get_similarity(ft_model, (x['title_left'], x['title_right'])), axis=1)
+    def get_similarity_vectorizer(self, value_left, value_right, vectorizer):
+        if value_left is None or value_right is None:
+            return None
+
+        if value_left == value_right:
+            return 1.0
+
+        tf_idf_left = vectorizer.transform([value_left])
+        tf_idf_right = vectorizer.transform([value_right])
+        sim = cosine_similarity(tf_idf_left, tf_idf_right)[0][0]
+        return sim
+
+    def compute_features(self, df, ft_model):
+        # TODO: encode all sentences at once to sbert (currently too inefficient)
+        text_df = pd.concat([df['title_left'], df['title_right']])
+        vectorizer = TfidfVectorizer()
+        vectorizer = vectorizer.fit(text_df.values)
+        df['title_sim'] = df.apply(
+            lambda x: self.get_similarity_vectorizer(x['title_left'], x['title_right'], vectorizer), axis=1)
         print("title done")
+
         df['description_sim'] = df.apply(
-            lambda x: get_similarity(ft_model, (x['description_left'], x['description_right'])), axis=1)
+            lambda x: get_similarity_sbert(ft_model, (x['description_left'], x['description_right'])), axis=1)
         print("description done")
-        df['brand_sim'] = df.apply(lambda x: get_similarity(sbert_model, (x['brand_left'], x['brand_right'])), axis=1)
-        print("brand done")
-        df['cat_sim'] = df.apply(lambda x: get_similarity(sbert_model, (x['category_left'], x['category_right'])),
-                                 axis=1)
-        print("cat done")
+
+        text_df = pd.concat([df['brand_left'], df['brand_right']])
+        vectorizer = TfidfVectorizer()
+        vectorizer = vectorizer.fit(text_df.values)
+        df['brand_sim'] = df.apply(lambda x: self.get_similarity_vectorizer(x['brand_left'], x['brand_right'], vectorizer), axis=1)
+
         df = df.drop(columns=['title_left', 'description_left', 'brand_left', 'price_left', 'specTableContent_left', \
                               'category_left', 'title_right', 'description_right', 'brand_right', 'price_right',
                               'specTableContent_right',

@@ -1,16 +1,17 @@
-from sentence_transformers import util
+from sentence_transformers import util, SentenceTransformer
 import os
 
 def load_file(input_file):
     pass
 
-def get_similarity(model, s_pair):
+def get_similarity_sbert(s_pair, model=None):
     if s_pair[0] == None or s_pair[1] == None:
         return None
 
     if s_pair[0] == s_pair[1]:
         return 1.0
-
+    if model is None:
+        model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     embds = model.encode(s_pair)
     sim_score = util.cos_sim(embds[0], embds[1]).item()
     return sim_score
