@@ -13,22 +13,23 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 class Pipeline():
-    def __init__(self, input_dir, output_dir):
+    def __init__(self, input_dir, output_dir, finetuning=True):
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.finetuning = finetuning
 
     def train(self):
         df = self.parse_data()
-        finetuned_model = self.finetune_sbert(
-            df=df,
-            output_dir=self.output_dir,
-            n_epochs=1
-        )
-        sbert_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+        if self.finetuning:
+            sbert_model = self.finetune_sbert(
+                df=df,
+                output_dir=self.output_dir,
+                n_epochs=1
+            )
+        else: sbert_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
         numerical_df = self.compute_features(
             df=df,
-            ft_model=finetuned_model,
-            sbert_model=sbert_model
+            ft_model=sbert_model
         )
         self.train_model(
             num_data=numerical_df
@@ -97,27 +98,23 @@ class Pipeline():
 
     def compute_features(self, df, ft_model):
         # TODO: encode all sentences at once to sbert (currently too inefficient)
+        num_df = pd.DataFrame()
         text_df = pd.concat([df['title_left'], df['title_right']])
         vectorizer = TfidfVectorizer()
         vectorizer = vectorizer.fit(text_df.values)
-        df['title_sim'] = df.apply(
+        num_df['title_sim'] = df.apply(
             lambda x: self.get_similarity_vectorizer(x['title_left'], x['title_right'], vectorizer), axis=1)
         print("title done")
 
-        df['description_sim'] = df.apply(
+        num_df['description_sim'] = df.apply(
             lambda x: get_similarity_sbert(ft_model, (x['description_left'], x['description_right'])), axis=1)
         print("description done")
 
         text_df = pd.concat([df['brand_left'], df['brand_right']])
         vectorizer = TfidfVectorizer()
         vectorizer = vectorizer.fit(text_df.values)
-        df['brand_sim'] = df.apply(lambda x: self.get_similarity_vectorizer(x['brand_left'], x['brand_right'], vectorizer), axis=1)
+        num_df['brand_sim'] = df.apply(lambda x: self.get_similarity_vectorizer(x['brand_left'], x['brand_right'], vectorizer), axis=1)
 
-        df = df.drop(columns=['title_left', 'description_left', 'brand_left', 'price_left', 'specTableContent_left', \
-                              'category_left', 'title_right', 'description_right', 'brand_right', 'price_right',
-                              'specTableContent_right',
-                              'category_right', 'pair_id'
-                              ])
         return df
 
     def train_model(self, num_data):
