@@ -1,5 +1,4 @@
 # product-matching
-# product-matching
 
 The project aims to carry out the data preprocessing, training and inference of a model which can match two products in different catalogue based on the text data.
 
