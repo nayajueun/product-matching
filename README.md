@@ -31,7 +31,8 @@ If they are the same, output = 1
 ## Implemented in pipeline.py:
 - Finetuning SBERT with description data
 - Fit text features relevant to semantic/lexical similarity with TfIdf vectorizer, and those relevant to paraphrase identification with SBERT encoder.
-- After computing numerical features using cosine similarity, train the data with XGBoost classifier
+- After computing numerical features using cosine similarity, train the data with XGBoost classifier<br />
+Run `test.py` to run the pipeline
 
 ## Result:
 ![image](https://user-images.githubusercontent.com/88599923/224301583-1969b8a1-81e7-4c90-b6a6-f287e1ee6058.png)<br />
